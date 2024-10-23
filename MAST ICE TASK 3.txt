@@ -1,0 +1,196 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, Button, StyleSheet, TouchableOpacity, Alert, FlatList } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+
+const Stack = createStackNavigator();
+
+// Recyclable and contaminant materials
+const cardsData = [
+  { id: 1, type: 'plastic', image: 'Plastic Bottle' },
+  { id: 2, type: 'plastic', image: 'Plastic Bottle' },
+  { id: 3, type: 'paper', image: 'Paper Bag' },
+  { id: 4, type: 'paper', image: 'Paper Bag' },
+  { id: 5, type: 'glass', image: 'Glass Jar' },
+  { id: 6, type: 'glass', image: 'Glass Jar' },
+  { id: 7, type: 'metal', image: 'Metal Can' },
+  { id: 8, type: 'metal', image: 'Metal Can' },
+  { id: 9, type: 'contaminant', image: 'Plastic Straw' },
+  { id: 10, type: 'contaminant', image: 'Plastic Straw' }
+];
+
+// Home Screen
+const HomeScreen = ({ navigation }) => {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Recycling Memory Challenge</Text>
+      <Text>Help clear the recycling bin by matching recyclable materials!</Text>
+      <Button
+        title="Start Recycling"
+        onPress={() => navigation.navigate('GameScreen')}
+      />
+    </View>
+  );
+};
+
+// Game Screen
+const GameScreen = ({ navigation }) => {
+  const [cards, setCards] = useState(shuffleCards(cardsData));
+  const [flippedCards, setFlippedCards] = useState([]);
+  const [matchedCards, setMatchedCards] = useState([]);
+  const [score, setScore] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(60); // 60-second limit
+
+  // Timer countdown
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeRemaining((prevTime) => {
+        if (prevTime <= 1) {
+          clearInterval(timer);
+          endGame();
+          return 0;
+        }
+        return prevTime - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleCardFlip = (card) => {
+    if (flippedCards.length === 2) return;
+
+    const newFlippedCards = [...flippedCards, card];
+
+    if (newFlippedCards.length === 2) {
+      // Check for a match
+      if (newFlippedCards[0].type === newFlippedCards[1].type) {
+        if (newFlippedCards[0].type === 'contaminant') {
+          setScore((prev) => prev - 10); // Contaminants lose points
+          Alert.alert('Contaminant!', 'That’s non-recyclable!');
+        } else {
+          setScore((prev) => prev + 20); // Recyclables gain points
+          setMatchedCards([...matchedCards, newFlippedCards[0].id, newFlippedCards[1].id]);
+        }
+      }
+
+      setTimeout(() => setFlippedCards([]), 1000); // Reset flipped cards after 1 second
+    } else {
+      setFlippedCards(newFlippedCards);
+    }
+  };
+
+  const endGame = () => {
+    Alert.alert('Time\'s Up!', `Your final score is ${score}`);
+    navigation.navigate('ResultsScreen', { score });
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text>Time Remaining: {timeRemaining}s</Text>
+      <Text>Score: {score}</Text>
+
+      <View style={styles.grid}>
+        {cards.map((card) => (
+          <TouchableOpacity
+            key={card.id}
+            style={[
+              styles.card,
+              matchedCards.includes(card.id) ? styles.matchedCard : null
+            ]}
+            onPress={() => handleCardFlip(card)}
+          >
+            <Text style={styles.cardText}>
+              {flippedCards.includes(card) || matchedCards.includes(card.id)
+                ? card.image
+                : 'Flip'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+// Results Screen
+const ResultsScreen = ({ route, navigation }) => {
+  const { score } = route.params;
+  const [highScores, setHighScores] = useState([]);
+
+  useEffect(() => {
+    // Simulate storing the score in a leaderboard
+    const newHighScores = [...highScores, { score, time: new Date().toLocaleString() }];
+    setHighScores(newHighScores);
+  }, [score]);
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Game Over</Text>
+      <Text>Your final score is: {score}</Text>
+      <Button title="Recycle More" onPress={() => navigation.navigate('Home')} />
+
+      <Text style={styles.title}>Leaderboard</Text>
+      <FlatList
+        data={highScores}
+        keyExtractor={(item, index) => index.toString()}
+        renderItem={({ item }) => (
+          <Text>
+            {item.time}: {item.score} points
+          </Text>
+        )}
+      />
+    </View>
+  );
+};
+
+// Helper function to shuffle cards
+const shuffleCards = (cards) => {
+  return cards.sort(() => 0.5 - Math.random());
+};
+
+// App Navigation
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="Home">
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="GameScreen" component={GameScreen} />
+        <Stack.Screen name="ResultsScreen" component={ResultsScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+// Styles
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  card: {
+    width: 80,
+    height: 80,
+    backgroundColor: '#eee',
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 10,
+    borderRadius: 5,
+  },
+  cardText: {
+    fontSize: 16,
+  },
+  matchedCard: {
+    backgroundColor: 'lightgreen',
+  },
+});
